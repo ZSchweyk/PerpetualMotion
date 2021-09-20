@@ -11,6 +11,7 @@ from kivy.app import App
 from kivy.lang import Builder
 from kivy.core.window import Window
 from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.properties import ObjectProperty
 from kivy.uix.button import Button
 from kivy.uix.floatlayout import FloatLayout
 from kivy.graphics import *
@@ -28,10 +29,9 @@ from kivy.core.window import Window
 from pidev.kivy import DPEAButton
 from pidev.kivy import PauseScreen
 from time import sleep
-import RPi.GPIO as GPIO 
+import RPi.GPIO as GPIO
 from pidev.stepper import stepper
 from pidev.Cyprus_Commands import Cyprus_Commands_RPi as cyprus
-
 
 # ////////////////////////////////////////////////////////////////
 # //                      GLOBAL VARIABLES                      //
@@ -59,8 +59,9 @@ class MyApp(App):
         self.title = "Perpetual Motion"
         return sm
 
+
 Builder.load_file('main.kv')
-Window.clearcolor = (.1, .1,.1, 1) # (WHITE)
+Window.clearcolor = (.1, .1, .1, 1)  # (WHITE)
 
 cyprus.open_spi()
 
@@ -68,13 +69,14 @@ cyprus.open_spi()
 # //                    SLUSH/HARDWARE SETUP                    //
 # ////////////////////////////////////////////////////////////////
 sm = ScreenManager()
-ramp = stepper(port = 0, speed = INIT_RAMP_SPEED)
+ramp = stepper(port=0, speed=INIT_RAMP_SPEED)
+
 
 # ////////////////////////////////////////////////////////////////
 # //                       MAIN FUNCTIONS                       //
 # //             SHOULD INTERACT DIRECTLY WITH HARDWARE         //
 # ////////////////////////////////////////////////////////////////
-	
+
 # ////////////////////////////////////////////////////////////////
 # //        DEFINE MAINSCREEN CLASS THAT KIVY RECOGNIZES        //
 # //                                                            //
@@ -93,25 +95,54 @@ class MainScreen(Screen):
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
         self.initialize()
+        self.cyprus = cyprus
+        self.cyprus.initialize()
+        self.cyprus.setup_servo(2)
+        self.m0 = stepper(port=0, micro_steps=32, hold_current=20, run_current=20, accel_current=20, deaccel_current=20,
+                          steps_per_unit=200, speed=2)
+        self.staircase_status = False
+        staircase = ObjectProperty(None)
+        staircaseSpeed = ObjectProperty(None)
 
     def toggleGate(self):
         print("Open and Close gate here")
 
     def toggleStaircase(self):
         print("Turn on and off staircase here")
-        
+        if self.staircase_status:
+            self.staircase_status = False
+            self.staircase.text = "Staircase On"
+            self.staircase.disabled = True
+        else:
+            self.staircase_status = True
+            self.staircase.text = "Staircase Off"
+            self.staircase.disabled = False
+        self.setStaircaseSpeed()
+
+
+
+
+
     def toggleRamp(self):
         print("Move ramp up and down here")
-        
+
     def auto(self):
         print("Run through one cycle of the perpetual motion machine")
-        
+
     def setRampSpeed(self, speed):
         print("Set the ramp speed and update slider text")
-        
-    def setStaircaseSpeed(self, speed):
+
+    def setStaircaseSpeed(self):
         print("Set the staircase speed and update slider text")
-        
+        if self.staircase_status:
+
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=float(self.staircaseSpeed.value) * 1000,
+                                  compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            self.staircaseSpeed.text = str(self.staircaseSpeed.value)
+        else:
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0,
+                                  compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+
     def initialize(self):
         print("Close gate, stop staircase and home ramp here")
 
@@ -120,12 +151,13 @@ class MainScreen(Screen):
         self.ids.staircase.color = YELLOW
         self.ids.ramp.color = YELLOW
         self.ids.auto.color = BLUE
-    
+
     def quit(self):
         print("Exit")
         MyApp().stop()
 
-sm.add_widget(MainScreen(name = 'main'))
+
+sm.add_widget(MainScreen(name='main'))
 
 # ////////////////////////////////////////////////////////////////
 # //                          RUN APP                           //

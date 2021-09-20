@@ -1,5 +1,7 @@
 <MainScreen>:
     name: 'main'
+    staircaseSpeed: staircaseSpeed
+    staircase: staircase
     FloatLayout:
         size_hint: None, None
 
@@ -92,12 +94,12 @@
             orientation: 'horizontal'
             min: 10
             max: 50
-            value: root.staircaseSpeed
+            value: 30
             step: 1
             center_x: root.width * 0.6
             y: root.height * 0.05
             size_hint_x: 7
-            on_value: root.setStaircaseSpeed(self.value)
+            on_value: root.setStaircaseSpeed()
 
 
         ##################
@@ -124,7 +126,7 @@
 
         Label:
             id: staircaseSpeedLabel
-            text: 'Staircase Speed: ' + str(root.staircaseSpeed)
+            text: 'Staircase Speed: ' + str(root.staircaseSpeed.value)
             font_size: 40
             center_x: root.width * 0.20
             y: root.height * 0.05
