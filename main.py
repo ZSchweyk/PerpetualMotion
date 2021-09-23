@@ -89,21 +89,26 @@ ramp = stepper(port=0, speed=INIT_RAMP_SPEED)
 class MainScreen(Screen):
     version = cyprus.read_firmware_version()
     staircaseSpeedText = '0'
-    rampSpeed = INIT_RAMP_SPEED
-    staircaseSpeed = 40
+    # rampSpeed = INIT_RAMP_SPEED
+    # staircaseSpeed = 40
+    staircaseSpeed = ObjectProperty(None)
+    staircase = ObjectProperty(None)
+    ramp = ObjectProperty(None)
+    rampSpeed = ObjectProperty(None)
+    gate = ObjectProperty(None)
 
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
         self.initialize()
+        cyprus.initialize()
 
         # Cyprus Stairs
         self.cyprus_stairs = cyprus
-        self.cyprus_stairs.initialize()
-        self.cyprus_stairs.setup_servo(1)
+        # self.cyprus_stairs.initialize()
+        # self.cyprus_stairs.setup_servo(1)
 
         self.staircase_status = False
-        staircase = ObjectProperty(None)
-        staircaseSpeed = ObjectProperty(None)
+        # staircase = ObjectProperty(None)
 
         # Stepper Ramp
         self.m0 = stepper(port=0, micro_steps=32, hold_current=20, run_current=20, accel_current=20, deaccel_current=20,
@@ -112,19 +117,22 @@ class MainScreen(Screen):
         self.initial_stepper_position = 0
         self.last_stepper_closed_position = self.initial_stepper_position
 
-        ramp = ObjectProperty(None)
-        rampSpeed = ObjectProperty(None)
+        # ramp = ObjectProperty(None)
+        # rampSpeed = ObjectProperty(None)
 
         # Servo Gate
-        gate = ObjectProperty(None)
+        # gate = ObjectProperty(None)
         self.servo_gate = cyprus
-        self.servo_gate.initialize()
+        # self.servo_gate.initialize()
         self.servo_gate.setup_servo(2)
         self.initial_servo_position = 0
         self.servo_gate.set_servo_position(2, self.initial_servo_position)
         self.last_servo_closed_position = self.initial_servo_position
 
         self.servo_gate.set_servo_position(2, self.initial_servo_position)
+        self.move_stepper_motor("down")
+        self.m0.setAsHome()
+        self.thread = None
 
     @staticmethod
     def is_port_on(port):
@@ -147,38 +155,45 @@ class MainScreen(Screen):
         if self.gate.text == "Open Gate":
             self.servo_gate.set_servo_position(2, .475)
             self.gate.text = "Close Gate"
+            print(1)
         else:
             if self.last_servo_closed_position == 0:
                 self.last_servo_closed_position = 1
+                print(2)
             else:
                 self.last_servo_closed_position = 0
+                print(3)
             self.servo_gate.set_servo_position(2, self.last_servo_closed_position)
             self.gate.text = "Open Gate"
 
     def toggleStaircase(self):
         if self.staircase_status:
+            print("Turning staircase OFF.")
             self.staircase_status = False
             self.staircase.text = "Staircase On"
             self.staircaseSpeed.disabled = True
         else:
+            print("Turning staircase ON.")
             self.staircase_status = True
             self.staircase.text = "Staircase Off"
             self.staircaseSpeed.disabled = False
+
         self.setStaircaseSpeed()
 
     def toggleRamp(self):
         self.ramp.disabled = True
-        thread = None
         if self.last_stepper_closed_position == 0:
-            thread = Thread(target=lambda: self.move_stepper_motor("up"))
+            self.thread = Thread(target=lambda: self.move_stepper_motor("up"))
+            self.move_stepper_motor("up")
             self.ramp.text = "Ramp to Bottom"
             self.last_stepper_closed_position = 29
         elif self.last_stepper_closed_position == 29:
-            thread = Thread(target=lambda: self.move_stepper_motor("down"))
+            self.thread = Thread(target=lambda: self.move_stepper_motor("down"))
+            self.move_stepper_motor("down")
             self.ramp.text = "Ramp to Top"
             self.last_stepper_closed_position = 0
-        self.ramp.disabled = False
-        thread.start()
+
+        self.thread.start()
 
     def move_stepper_motor(self, direction):
         port = None
@@ -192,10 +207,14 @@ class MainScreen(Screen):
             port = 8
 
         while True:
+            print(self.m0.get_position_in_units())
             if self.is_port_on(port):
                 self.m0.hardStop()
                 break
             sleep(.05)
+
+        self.ramp.disabled = False
+        return
 
     def auto(self):
         pass
@@ -203,11 +222,11 @@ class MainScreen(Screen):
     def setRampSpeed(self):
         self.m0.hard_stop()
         self.m0.set_speed(self.m0_speed(self.rampSpeed.value))
-        return self.m0_speed(self.rampSpeed.value)
+
+        # return self.m0_speed(self.rampSpeed.value)
 
     def setStaircaseSpeed(self):
         if self.staircase_status:
-
             self.cyprus_stairs.set_pwm_values(1, period_value=100000,
                                               compare_value=float(self.staircaseSpeed.value) * 1000,
                                               compare_mode=self.cyprus_stairs.LESS_THAN_OR_EQUAL)
@@ -225,9 +244,10 @@ class MainScreen(Screen):
         self.ids.ramp.color = YELLOW
         self.ids.auto.color = BLUE
 
-    def quit(self):
-        self.servo_gate.set_servo_position(2, self.initial_servo_position)
-        self.move_stepper_motor("down")
+    @staticmethod
+    def quit():
+        # self.m0.hardStop()
+        # self.cyprus_stairs.close()
         MyApp().stop()
 
 
