@@ -96,6 +96,7 @@ class MainScreen(Screen):
     ramp = ObjectProperty(None)
     rampSpeed = ObjectProperty(None)
     gate = ObjectProperty(None)
+    auto = ObjectProperty(None)
 
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
@@ -184,12 +185,10 @@ class MainScreen(Screen):
         self.ramp.disabled = True
         if self.last_stepper_closed_position == 0:
             self.thread = Thread(target=lambda: self.move_stepper_motor("up"))
-            self.move_stepper_motor("up")
             self.ramp.text = "Ramp to Bottom"
             self.last_stepper_closed_position = 29
         elif self.last_stepper_closed_position == 29:
             self.thread = Thread(target=lambda: self.move_stepper_motor("down"))
-            self.move_stepper_motor("down")
             self.ramp.text = "Ramp to Top"
             self.last_stepper_closed_position = 0
 
@@ -205,19 +204,69 @@ class MainScreen(Screen):
         elif direction == "down":
             self.m0.start_relative_move(-29)
             port = 8
+        # elif direction == "home":
+        #     self.m0.goHome()
+        #     port = 8
 
         while True:
             print(self.m0.get_position_in_units())
             if self.is_port_on(port):
+                print("Port " + str(port) + " activated")
                 self.m0.hardStop()
                 break
             sleep(.05)
 
+        print("Exited While Loop")
+
         self.ramp.disabled = False
         return
 
-    def auto(self):
-        pass
+    def automatic_loop(self):
+        self.auto.disabled = True
+        self.gate.text = "Open Gate"
+        self.servo_gate.set_servo_position(2, 0)
+        self.gate.disabled = True
+        self.move_stepper_motor("down")
+        self.ramp.text = "Ramp to Top"
+        self.last_stepper_closed_position = 0
+        self.ramp.disabled = True
+        # Set ramp speed here
+        self.rampSpeed.disabled = True
+        self.staircase.disabled = True
+
+        self.move_stepper_motor("up")
+        self.ramp.text = "Ramp to Bottom"
+
+        thread = Thread(target=lambda: self.move_stepper_motor("down"))
+        thread.start()
+        self.ramp.text = "Ramp to Top"
+
+        self.staircase_status = True
+        self.staircaseSpeed.value = 50
+        self.staircaseSpeed.disabled = True
+        self.staircase.text = "Staircase Off"
+        self.setStaircaseSpeed()
+
+        sleep(15)
+
+        self.staircase_status = False
+        self.staircase.text = "Staircase On"
+        self.setStaircaseSpeed()
+
+        self.toggleGate()
+        sleep(3)
+        self.gate.text = "Close Gate"
+        self.toggleGate()
+        self.gate.text = "Open Gate"
+        self.toggleGate()
+        self.gate.text = "Close Gate"
+        self.toggleGate()
+
+        all_btns_and_sliders = [self.auto, self.gate, self.ramp, self.rampSpeed, self.staircase, self.staircaseSpeed]
+        for elem in all_btns_and_sliders:
+            elem.disabled = False
+
+        return
 
     def setRampSpeed(self):
         self.m0.hard_stop()
