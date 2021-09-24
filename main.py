@@ -117,6 +117,7 @@ class MainScreen(Screen):
         self.m0_speed = lambda speed: (speed / 100) * (self.m0.speed / self.m0.steps_per_unit)
         self.initial_stepper_position = 0
         self.last_stepper_closed_position = self.initial_stepper_position
+        self.m0_direction = 0
 
         # ramp = ObjectProperty(None)
         # rampSpeed = ObjectProperty(None)
@@ -131,9 +132,10 @@ class MainScreen(Screen):
         self.last_servo_closed_position = self.initial_servo_position
 
         self.servo_gate.set_servo_position(2, self.initial_servo_position)
-        self.move_stepper_motor("down")
-        self.m0.setAsHome()
-        self.thread = None
+        self.toggleRampThread()
+
+    def switch_m0_direction(self):
+        self.m0_direction = 1 - self.m0_direction
 
     @staticmethod
     def is_port_on(port):
@@ -181,44 +183,65 @@ class MainScreen(Screen):
 
         self.setStaircaseSpeed()
 
-    def toggleRamp(self):
-        self.ramp.disabled = True
-        if self.last_stepper_closed_position == 0:
-            self.thread = Thread(target=lambda: self.move_stepper_motor("up"))
-            self.ramp.text = "Ramp to Bottom"
-            self.last_stepper_closed_position = 29
-        elif self.last_stepper_closed_position == 29:
-            self.thread = Thread(target=lambda: self.move_stepper_motor("down"))
-            self.ramp.text = "Ramp to Top"
-            self.last_stepper_closed_position = 0
+    def toggleRampThread(self):
+        Thread(target=self.toggleRamp).start()
 
-        self.thread.start()
+    def toggleRamp(self):
+        if self.m0_direction == 1:
+            self.m0.relative_move(.5)
+        print("Ramp Speed: ", 6400 * self.rampSpeed.value)
+        self.m0.go_until_press(self.m0_direction, 6400 * self.rampSpeed.value)
+
+        if self.m0_direction == 1:
+            self.ramp.text = "Ramp to Bottom"
+            while True:
+                if self.is_port_on(6):
+                    self.m0.hardStop()
+                    break
+                sleep(.05)
+        else:
+            self.ramp.text = "Ramp to Top"
+
+        self.switch_m0_direction()
+        print("Switched m0 direction to ", self.m0_direction)
+        return
+        # self.ramp.disabled = True
+        # if self.last_stepper_closed_position == 0:
+        #     self.thread = Thread(target=lambda: self.move_stepper_motor("up"))
+        #     self.ramp.text = "Ramp to Bottom"
+        #     self.last_stepper_closed_position = 29
+        # elif self.last_stepper_closed_position == 29:
+        #     self.thread = Thread(target=lambda: self.move_stepper_motor("down"))
+        #     self.ramp.text = "Ramp to Top"
+        #     self.last_stepper_closed_position = 0
+        #
+        # self.thread.start()
 
     def move_stepper_motor(self, direction):
-        port = None
-        if direction == "up":
-            self.m0.start_relative_move(29)
-            port = 6
-            # while not self.is_port_on(6):
-            #     self.m0.start_relative_move(.1)
-        elif direction == "down":
-            self.m0.start_relative_move(-29)
-            port = 8
-        # elif direction == "home":
-        #     self.m0.goHome()
+        # port = None
+        # if direction == "up":
+        #     self.m0.start_relative_move(29)
+        #     port = 6
+        #     # while not self.is_port_on(6):
+        #     #     self.m0.start_relative_move(.1)
+        # elif direction == "down":
+        #     self.m0.start_relative_move(-29)
         #     port = 8
+        # # elif direction == "home":
+        # #     self.m0.goHome()
+        # #     port = 8
 
-        while True:
-            print(self.m0.get_position_in_units())
-            if self.is_port_on(port):
-                print("Port " + str(port) + " activated")
-                self.m0.hardStop()
-                break
-            sleep(.05)
-
-        print("Exited While Loop")
-
-        self.ramp.disabled = False
+        # while True:
+        #     print(self.m0.get_position_in_units())
+        #     if self.is_port_on(port):
+        #         print("Port " + str(port) + " activated")
+        #         self.m0.hardStop()
+        #         break
+        #     sleep(.05)
+        #
+        # print("Exited While Loop")
+        #
+        # self.ramp.disabled = False
         return
 
     def automatic_loop(self):
