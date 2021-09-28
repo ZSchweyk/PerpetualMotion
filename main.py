@@ -101,27 +101,21 @@ class MainScreen(Screen):
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
 
-        print("Here")
-
         cyprus.initialize()
 
         # Cyprus Stairs
         self.cyprus_stairs = cyprus
 
         # Stepper Ramp
-        print("Before Stepper")
         self.m0 = stepper(port=0, micro_steps=32, hold_current=20, run_current=20, accel_current=20, deaccel_current=20,
                           steps_per_unit=200, speed=2)
-        print("After Stepper")
 
         # Servo Gate
         self.servo_gate = cyprus
         self.servo_gate.setup_servo(2)
 
         # Set everything to default positions.
-        print("Before Initialize")
-        self.initialize()
-        print("After Initialize")
+        self.initialize(True)
 
 
     def switch_m0_direction(self):
@@ -158,12 +152,10 @@ class MainScreen(Screen):
 
     def toggleStaircase(self):
         if self.staircase_status:
-            print("Turning staircase OFF.")
             self.staircase_status = False
             self.staircase.text = "Staircase On"
             self.staircaseSpeed.disabled = True
         else:
-            print("Turning staircase ON.")
             self.staircase_status = True
             self.staircase.text = "Staircase Off"
             self.staircaseSpeed.disabled = False
@@ -174,8 +166,9 @@ class MainScreen(Screen):
         Thread(target=self.toggleRamp).start()
 
     def toggleRamp(self):
+        self.ramp.disabled = True
         if self.m0_direction == 1:
-            self.m0.relative_move(.5)
+            self.m0.relative_move(1)
         # print("Ramp Speed: ", 6400 * self.rampSpeed.value)
         self.m0.go_until_press(self.m0_direction, 6400 * self.rampSpeed.value)
 
@@ -190,18 +183,18 @@ class MainScreen(Screen):
             self.ramp.text = "Ramp to Top"
 
         self.switch_m0_direction()
-        print("Switched m0 direction to ", self.m0_direction)
+        # print("Switched m0 direction to ", self.m0_direction)
+        self.ramp.disabled = False
         return
 
     def automatic_loop(self):
-        self.initialize()
         print("self.initialize()")
-        self.switch_m0_direction()
-        print("self.switch_m0_direction()")
+        self.initialize(False)
         self.toggleRamp()
         print("self.toggleRamp()")
         self.toggleRampThread()
         print("self.toggleRampThread()")
+        self.staircaseSpeed.value = 50
         self.toggleStaircase()
         print("self.toggleStaircase()")
         sleep(15)
@@ -212,6 +205,8 @@ class MainScreen(Screen):
         print("self.toggleGate()")
         sleep(2)
         print("sleep(2)")
+        self.toggleGate()
+        self.toggleGate()
         self.toggleGate()
         print("self.toggleGate()")
 
@@ -240,21 +235,24 @@ class MainScreen(Screen):
             self.cyprus_stairs.set_pwm_values(1, period_value=100000, compare_value=0,
                                               compare_mode=self.cyprus_stairs.LESS_THAN_OR_EQUAL)
 
-    def initialize(self):
+    def initialize(self, on_thread):
         self.initial_servo_position = 0
         self.servo_gate.set_servo_position(2, self.initial_servo_position)
         self.last_servo_closed_position = self.initial_servo_position
-        print("Initialized Gate")
+        print("\tInitialized Gate")
 
         self.m0_speed = lambda speed: (speed / 100) * (self.m0.speed / self.m0.steps_per_unit)
         self.m0_direction = 0
-        self.toggleRampThread()
-        print("Initialized Ramp")
+        if on_thread:
+            self.toggleRampThread()
+        else:
+            self.toggleRamp()
+        print("\tInitialized Ramp")
 
         self.staircase_status = False
         # self.toggleStaircase()
         # self.setStaircaseSpeed()
-        print("Initialized Stairs")
+        print("\tInitialized Stairs")
 
     def resetColors(self):
         self.ids.gate.color = YELLOW
